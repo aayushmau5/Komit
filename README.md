@@ -4,8 +4,8 @@ A sleek desktop app for reviewing GitHub pull requests locally.
 
 Paste a PR URL, and Komit fetches the diff via Git over SSH, renders it with syntax highlighting, and keeps a local history so you can revisit PRs instantly.
 
-<img width="2624" height="1824" alt="image" src="https://github.com/user-attachments/assets/d7dad7cc-7c1d-40bf-8210-9ddd4ff4e15b" />
-<img width="2624" height="1824" alt="image" src="https://github.com/user-attachments/assets/3e589c67-e9db-47c4-8b5a-a30a443774db" />
+<img width="1312" height="912" alt="Screen 1" src="https://github.com/user-attachments/assets/1a5788af-2c3c-4c83-a46d-575626b06111" />
+<img width="1312" height="912" alt="Screen 2" src="https://github.com/user-attachments/assets/b21f8341-8940-4b3a-8a46-47d459a697f7" />
 
 ## Features
 
