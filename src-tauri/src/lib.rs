@@ -101,7 +101,7 @@ struct PrMetadata {
 }
 
 fn fetch_pr_metadata_sync(
-    repo_path_str: &str,
+    _repo_path_str: &str,
     owner: &str,
     repo: &str,
     pr_number: u32,
@@ -119,43 +119,35 @@ fn fetch_pr_metadata_sync(
         ],
     );
 
-    if let Ok(json_str) = gh_result {
-        #[derive(Deserialize)]
-        struct GhPrView {
-            #[serde(rename = "baseRefName")]
-            base_ref_name: Option<String>,
-            title: Option<String>,
-            body: Option<String>,
-        }
-
-        if let Ok(parsed) = serde_json::from_str::<GhPrView>(&json_str) {
-            if let Some(base) = parsed.base_ref_name.filter(|s| !s.is_empty()) {
-                return Ok(PrMetadata {
-                    base_branch: base,
-                    title: parsed.title,
-                    body: parsed.body,
-                });
+    match gh_result {
+        Ok(json_str) => {
+            #[derive(Deserialize)]
+            struct GhPrView {
+                #[serde(rename = "baseRefName")]
+                base_ref_name: Option<String>,
+                title: Option<String>,
+                body: Option<String>,
             }
+
+            let parsed = serde_json::from_str::<GhPrView>(&json_str)
+                .map_err(|e| format!("Failed to parse gh output: {}", e))?;
+
+            let base = parsed
+                .base_ref_name
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| "gh returned empty baseRefName".to_string())?;
+
+            Ok(PrMetadata {
+                base_branch: base,
+                title: parsed.title,
+                body: parsed.body,
+            })
         }
+        Err(e) => Err(format!(
+            "Failed to fetch PR metadata via gh CLI. Is `gh` installed and authenticated? Error: {}",
+            e
+        )),
     }
-
-    let sym_output = run_git(vec![
-        "-C".into(),
-        repo_path_str.into(),
-        "symbolic-ref".into(),
-        "HEAD".into(),
-    ])?;
-
-    let trimmed = sym_output.trim();
-    let branch = trimmed
-        .strip_prefix("refs/heads/")
-        .ok_or_else(|| format!("Unexpected symbolic-ref output: {}", trimmed))?;
-
-    Ok(PrMetadata {
-        base_branch: branch.to_string(),
-        title: None,
-        body: None,
-    })
 }
 
 fn diff_cache_path(owner: &str, repo: &str, pr_number: u32) -> Result<PathBuf, String> {
@@ -252,13 +244,6 @@ async fn fetch_pr_diff(
 
     if repo_path.exists() {
         send_progress(&on_progress, "Fetching latest from origin…", 15);
-        git(vec![
-            "-C".into(),
-            repo_path_str.clone(),
-            "fetch".into(),
-            "origin".into(),
-        ])
-        .await?;
     } else {
         send_progress(
             &on_progress,
@@ -279,21 +264,17 @@ async fn fetch_pr_diff(
         .await?;
     }
 
-    send_progress(
-        &on_progress,
-        &format!("Fetching PR #{}…", pr_number),
-        45,
-    );
-    git(vec![
+    // Bare clones have no default fetch refspec — ensure one exists
+    let _ = git(vec![
         "-C".into(),
         repo_path_str.clone(),
-        "fetch".into(),
-        "origin".into(),
-        format!("+refs/pull/{}/head:refs/heads/pr-{}", pr_number, pr_number),
+        "config".into(),
+        "remote.origin.fetch".into(),
+        "+refs/heads/*:refs/heads/*".into(),
     ])
-    .await?;
+    .await;
 
-    send_progress(&on_progress, "Fetching PR metadata…", 65);
+    send_progress(&on_progress, "Fetching PR metadata…", 30);
     let rps = repo_path_str.clone();
     let o = owner.clone();
     let r = repo.clone();
@@ -303,20 +284,22 @@ async fn fetch_pr_diff(
     .await
     .map_err(|e| format!("Task failed: {}", e))??;
 
-    send_progress(&on_progress, "Fetching base branch…", 75);
+    send_progress(
+        &on_progress,
+        &format!("Fetching PR #{} and base branch…", pr_number),
+        45,
+    );
     git(vec![
         "-C".into(),
         repo_path_str.clone(),
         "fetch".into(),
         "origin".into(),
-        format!(
-            "+refs/heads/{}:refs/heads/{}",
-            metadata.base_branch, metadata.base_branch
-        ),
+        format!("+refs/heads/{}:refs/heads/{}", metadata.base_branch, metadata.base_branch),
+        format!("+refs/pull/{}/head:refs/heads/pr-{}", pr_number, pr_number),
     ])
     .await?;
 
-    send_progress(&on_progress, "Generating diff…", 85);
+    send_progress(&on_progress, "Generating diff…", 80);
     let diff = git(vec![
         "-C".into(),
         repo_path_str.clone(),
