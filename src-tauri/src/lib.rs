@@ -303,7 +303,20 @@ async fn fetch_pr_diff(
     .await
     .map_err(|e| format!("Task failed: {}", e))??;
 
-    send_progress(&on_progress, "Generating diff…", 80);
+    send_progress(&on_progress, "Fetching base branch…", 75);
+    git(vec![
+        "-C".into(),
+        repo_path_str.clone(),
+        "fetch".into(),
+        "origin".into(),
+        format!(
+            "+refs/heads/{}:refs/heads/{}",
+            metadata.base_branch, metadata.base_branch
+        ),
+    ])
+    .await?;
+
+    send_progress(&on_progress, "Generating diff…", 85);
     let diff = git(vec![
         "-C".into(),
         repo_path_str.clone(),
