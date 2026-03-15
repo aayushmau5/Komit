@@ -54,9 +54,26 @@ fn data_dir() -> Result<PathBuf, String> {
     Ok(base.join("komit"))
 }
 
+fn env_path() -> String {
+    let system_path = std::env::var("PATH").unwrap_or_default();
+    let extra = [
+        "/opt/homebrew/bin",
+        "/opt/homebrew/sbin",
+        "/usr/local/bin",
+    ];
+    let mut parts: Vec<&str> = extra.to_vec();
+    for p in system_path.split(':') {
+        if !parts.contains(&p) {
+            parts.push(p);
+        }
+    }
+    parts.join(":")
+}
+
 fn run_git(args: Vec<String>) -> Result<String, String> {
     let output = Command::new("git")
         .args(&args)
+        .env("PATH", env_path())
         .output()
         .map_err(|e| format!("Failed to run git: {}", e))?;
 
@@ -70,6 +87,7 @@ fn run_git(args: Vec<String>) -> Result<String, String> {
 fn run_cmd(cmd: &str, args: Vec<String>) -> Result<String, String> {
     let output = Command::new(cmd)
         .args(&args)
+        .env("PATH", env_path())
         .output()
         .map_err(|e| format!("Failed to run `{}`: {}", cmd, e))?;
 
