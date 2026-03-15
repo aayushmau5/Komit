@@ -4,6 +4,8 @@ A sleek desktop app for reviewing GitHub pull requests locally.
 
 Paste a PR URL, and Komit fetches the diff via Git over SSH, renders it with syntax highlighting, and keeps a local history so you can revisit PRs instantly.
 
+
+
 ## Features
 
 - **Syntax-highlighted diffs** powered by [Shiki](https://shiki.matsu.io/) via web workers for smooth rendering
